@@ -61,12 +61,18 @@ jobs:
           ! grep -v "arm64" macho.txt | grep -q .
           ! grep -E "x86_64|i386|ppc" macho.txt
 
+      - name: Package app
+        if: matrix.configuration == 'ForBuilding'
+        # ditto keeps the signature, symlinks and resource names intact (the bundle has files the
+        # artifact uploader can't take directly, e.g. "How does this thing work?.nvhelp")
+        run: ditto -c -k --keepParent build/DerivedData/Build/Products/ForBuilding/nvALT.app nvALT-arm64.zip
+
       - name: Upload app
         if: matrix.configuration == 'ForBuilding'
         uses: actions/upload-artifact@v4
         with:
           name: nvALT-arm64
-          path: build/DerivedData/Build/Products/ForBuilding/nvALT.app
+          path: nvALT-arm64.zip
 
       - name: Upload build log
         if: always()
