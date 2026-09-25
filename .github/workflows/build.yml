@@ -1,0 +1,60 @@
+name: Build (Apple silicon)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Development, ForBuilding]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          uname -m
+          sw_vers
+          xcodebuild -version
+          xcrun --show-sdk-version
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Notation.xcodeproj \
+            -target Notation \
+            -configuration "${{ matrix.configuration }}" \
+            -destination 'generic/platform=macOS' \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee build.log | grep -E "error:|warning: .*arm64|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Verify architecture
+        run: |
+          APP="build/${{ matrix.configuration }}/nvALT.app"
+          file "$APP/Contents/MacOS/nvALT"
+          lipo -archs "$APP/Contents/MacOS/nvALT" | grep -qx arm64
+          # Every Mach-O in the bundle must be arm64-only (no Rosetta dependency).
+          find "$APP" -type f -perm -u+x -print0 | xargs -0 file | grep Mach-O | tee macho.txt
+          ! grep -v "arm64" macho.txt | grep -q .
+          ! grep -E "x86_64|i386|ppc" macho.txt
+
+      - name: Upload app
+        if: matrix.configuration == 'ForBuilding'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvALT-arm64
+          path: build/ForBuilding/nvALT.app
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.configuration }}
+          path: build.log
