@@ -1,17 +1,46 @@
 # nvALT 2
 
+> **This fork** is a modernized, Apple silicon–only build of nvALT for current macOS.
+> See [Building on Apple silicon](#building-on-apple-silicon) below.
+
 A collaboration between Brett Terpstra (ttscoff) and David Halter (ElasticThreads) based on [DivineDominion's](github.com/divineDominion/nv) fork. nvALT adds a few features we'd been looking for (and let me get some coding practice).
 
 ![Screenshot](http://img.skitch.com/20110520-k5y4i6i3p8ciftq2dbs7rx64e7.jpg)
 
 ## Contents
 
+- [Building on Apple silicon](#building-on-apple-silicon)
 - [About nvALT](#about-nvalt)
 - [What it is](#what-it-is)
 - [Additional Features](#additional-features)
 - [Customization](#customization)
 - [Download](#download)
 - [Credits](#credits)
+
+## Building on Apple silicon
+
+Requirements: an Apple silicon Mac and Xcode 16 or later. The app targets macOS 14 and later and is built for `arm64` only (no Rosetta needed).
+
+1. Open `Notation.xcodeproj` in Xcode. Xcode fetches the one Swift package dependency ([swift-cmark](https://github.com/swiftlang/swift-cmark), used for the Markdown preview) automatically.
+2. Pick the **Notation Release** scheme (optimized) or **Notation Develop** (debug), then build and run.
+
+From the command line:
+
+    xcodebuild -project Notation.xcodeproj -scheme "Notation Release" -derivedDataPath build/DerivedData build
+    open build/DerivedData/Build/Products/ForBuilding/nvALT.app
+
+Builds are signed ad hoc ("Sign to Run Locally"), which is enough to run the app on the Mac that built it. To distribute it, set your own signing team and notarize.
+
+What changed from the original Intel build:
+
+- **Markdown/MultiMarkdown preview** is rendered in-process with cmark-gfm (tables, footnotes, strikethrough, task lists, autolinks, smart punctuation) instead of launching the bundled Intel `multimarkdown` 4.7 executable for every refresh. A leading MultiMarkdown metadata block (or YAML front matter) is hidden from the preview, and headers get MultiMarkdown-style `id`s.
+- **Encryption and hashing** use Apple's CommonCrypto instead of bundled 32/64-bit Intel OpenSSL libraries. The on-disk format is unchanged, so existing (encrypted) note databases open as before.
+- **Link detection** in notes uses the system's `NSDataDetector` instead of the Intel-only AutoHyperlinks framework.
+- **Sparkle** auto-updates are removed (the old feed serves the original Intel app). The "Check for Updates…" menu items are hidden.
+- **HTML import as Markdown** relied on bundled Python 2 scripts, and macOS no longer ships Python 2; HTML files now import as rich text.
+- **Textile** preview and **TaskPaper** conversion still use the system `perl` and `ruby`; if macOS stops shipping those, the preview says so instead of failing.
+
+Preferences and notes are shared with the original nvALT (same bundle identifier, `net.elasticthreads.nv`).
 
 ## About nvALT
 

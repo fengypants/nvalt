@@ -42,7 +42,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             -IDEBuildingContinueBuildingAfterErrors=YES \
             > build.log 2>&1 || true
-          grep -E "error:|BUILD (SUCCEEDED|FAILED)" build.log | sort -u | head -300 || true
+          grep -E ": (fatal )?error: |error: |BUILD (SUCCEEDED|FAILED)" build.log | grep -v "warning:" | sort -u | head -300 || true
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Verify architecture

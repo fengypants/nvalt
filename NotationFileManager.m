@@ -28,6 +28,7 @@
 
 #import <Foundation/Foundation.h>
 #include <CommonCrypto/CommonDigest.h>
+#include "FSExchangeObjectsCompat.h"
 
 NSString *NotesDatabaseFileName = @"Notes & Settings";
 

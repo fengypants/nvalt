@@ -16,7 +16,6 @@
 
 #import "NotationController.h"
 #import "NotesTableView.h"
-//#import "Spaces.h"
 
 @class LinkingEditor;
 @class EmptyView;

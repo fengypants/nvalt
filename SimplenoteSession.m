@@ -17,7 +17,12 @@
 
 // SimplenoteConfig.h should be copied from SimplenoteConfig-example.h and set up with your Simperium API key
 // If you choose not to use Simperium, just include an empty string in the file.
+//SimperiumConfig.h holds a private API key and is not checked in; fall back to the placeholder key
+#if __has_include("SimperiumConfig.h")
 #import "SimperiumConfig.h"
+#else
+#import "SimperiumConfig-example.h"
+#endif
 #import "SimplenoteSession.h"
 #import "SyncResponseFetcher.h"
 #import "SimplenoteEntryCollector.h"
