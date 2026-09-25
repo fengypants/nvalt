@@ -144,7 +144,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.2.8</string>
+	<string>2.3</string>
 	<key>CFBundleSignature</key>
 	<string>N†l√</string>
 	<key>CFBundleSupportedPlatforms</key>
@@ -156,8 +156,6 @@
 		<dict>
 			<key>CFBundleURLName</key>
 			<string>net.elasticthreads.nv</string>
-		</dict>
-		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>nvalt</string>
@@ -166,16 +164,11 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>128</string>
+	<string>200</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>${MACOSX_DEPLOYMENT_TARGET}</string>
-	<key>LSMinimumSystemVersionByArchitecture</key>
-	<dict>
-		<key>x86_64</key>
-		<string>${MACOSX_DEPLOYMENT_TARGET}</string>
-	</dict>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
@@ -183,6 +176,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>nvALT sends Apple Events to external editors and to Marked to open and preview your notes.</string>
 	<key>NSAppleScriptEnabled</key>
 	<true/>
 	<key>NSMainNibFile</key>
@@ -225,15 +220,5 @@
 	<true/>
 	<key>OSAScriptingDefinition</key>
 	<string>Notation.sdef</string>
-	<key>SUCheckAtStartup</key>
-	<false/>
-	<key>SUPublicDSAKeyFile</key>
-	<string>dsa_pub.pem</string>
-	<key>SUScheduledCheckInterval</key>
-	<real>345600</real>
-	<key>SmartCrashReports_CompanyName</key>
-	<string>Notational.net</string>
-	<key>SmartCrashReports_EmailTicket</key>
-	<string>SCR-51ED0F7B2A</string>
 </dict>
 </plist>

@@ -13,7 +13,11 @@
 +(NSString*)processTextile:(NSString*)inputString
 {
 	NSString* mdScriptPath = [[[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Textile_2.12"] stringByAppendingPathComponent:@"textilize.pl"];
-	
+
+	//Textile is rendered by a perl script; macOS may eventually stop shipping perl
+	if (![[NSFileManager defaultManager] isExecutableFileAtPath:@"/usr/bin/perl"])
+		return @"<p><em>Textile preview requires /usr/bin/perl, which is not installed on this Mac.</em></p>";
+
 	NSTask* task = [[NSTask alloc] init];
     NSMutableArray* args = [NSMutableArray array];
     

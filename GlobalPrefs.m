@@ -107,10 +107,11 @@ NSString *HotKeyAppToFrontName = @"bring Notational Velocity to the foreground";
 @implementation GlobalPrefs
 
 static void sendCallbacksForGlobalPrefs(GlobalPrefs* self, SEL selector, id originalSender) {
-    // FIXME
 	if (originalSender != self) {
-		self->runCallbacksIMP(self, @selector(notifyCallbacksForSelector:excludingSender:), 
-							 selector, originalSender);
+		//IMPs must be called through their exact (non-variadic) prototype: on arm64, variadic
+		//arguments are passed on the stack rather than in registers, so a variadic call would hand the method garbage
+		void (*notifyCallbacks)(id, SEL, SEL, id) = (void (*)(id, SEL, SEL, id))self->runCallbacksIMP;
+		notifyCallbacks(self, @selector(notifyCallbacksForSelector:excludingSender:), selector, originalSender);
 	}
 }
 

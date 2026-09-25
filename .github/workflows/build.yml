@@ -11,7 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [Development, ForBuilding]
+        include:
+          - scheme: Notation Develop
+            configuration: Development
+          - scheme: Notation Release
+            configuration: ForBuilding
     steps:
       - uses: actions/checkout@v4
 
@@ -25,19 +29,25 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
+          # report every compile error in one run instead of stopping at the first
+          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
+          defaults write com.apple.dt.xcodebuild IDEBuildingContinueBuildingAfterErrors -bool YES
           xcodebuild build \
             -project Notation.xcodeproj \
-            -target Notation \
+            -scheme "${{ matrix.scheme }}" \
             -configuration "${{ matrix.configuration }}" \
+            -derivedDataPath build/DerivedData \
             -destination 'generic/platform=macOS' \
             CODE_SIGN_IDENTITY=- \
             CODE_SIGNING_REQUIRED=NO \
-            2>&1 | tee build.log | grep -E "error:|warning: .*arm64|BUILD (SUCCEEDED|FAILED)" || true
+            -IDEBuildingContinueBuildingAfterErrors=YES \
+            > build.log 2>&1 || true
+          grep -E "error:|BUILD (SUCCEEDED|FAILED)" build.log | sort -u | head -300 || true
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Verify architecture
         run: |
-          APP="build/${{ matrix.configuration }}/nvALT.app"
+          APP="build/DerivedData/Build/Products/${{ matrix.configuration }}/nvALT.app"
           file "$APP/Contents/MacOS/nvALT"
           lipo -archs "$APP/Contents/MacOS/nvALT" | grep -qx arm64
           # Every Mach-O in the bundle must be arm64-only (no Rosetta dependency).
@@ -50,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nvALT-arm64
-          path: build/ForBuilding/nvALT.app
+          path: build/DerivedData/Build/Products/ForBuilding/nvALT.app
 
       - name: Upload build log
         if: always()
