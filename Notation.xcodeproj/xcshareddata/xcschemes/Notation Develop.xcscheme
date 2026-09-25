@@ -83,7 +83,7 @@
       buildConfiguration = "Development">
    </AnalyzeAction>
    <ArchiveAction
-      buildConfiguration = "Deployment"
+      buildConfiguration = "ForBuilding"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

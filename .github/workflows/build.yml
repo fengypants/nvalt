@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +33,8 @@ jobs:
           # report every compile error in one run instead of stopping at the first
           defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
           defaults write com.apple.dt.xcodebuild IDEBuildingContinueBuildingAfterErrors -bool YES
-          xcodebuild build \
+          # macOS has no timeout(1); perl's alarm kills xcodebuild if it hangs so the log still gets printed
+          perl -e 'alarm shift; exec @ARGV' 900 xcodebuild build \
             -project Notation.xcodeproj \
             -scheme "${{ matrix.scheme }}" \
             -configuration "${{ matrix.configuration }}" \
@@ -43,6 +45,10 @@ jobs:
             -IDEBuildingContinueBuildingAfterErrors=YES \
             > build.log 2>&1 || true
           grep -E ": (fatal )?error: |error: |BUILD (SUCCEEDED|FAILED)" build.log | grep -v "warning:" | sort -u | head -300 || true
+          # linker failures ("Undefined symbols" plus the symbol lines that follow)
+          grep -A12 -E "^Undefined symbols|^ld: " build.log | head -120 || true
+          echo "---- last lines of build.log ----"
+          tail -40 build.log
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Verify architecture
