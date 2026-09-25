@@ -30,6 +30,4 @@ Notation.xcodeproj/project.xcworkspace/xcshareddata/*
 .DS_Store
 Icon?
 
-# Local configuration
-SimperiumConfig.h
 nvalt.taskpaper

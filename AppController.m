@@ -18,7 +18,6 @@
 #import "NotationPrefs.h"
 #import "PrefsWindowController.h"
 #import "NoteAttributeColumn.h"
-#import "NotationSyncServiceManager.h"
 #import "NotationDirectoryManager.h"
 #import "NotationFileManager.h"
 #import "NSString_NV.h"
@@ -32,12 +31,9 @@
 #import "LinkingEditor.h"
 #import "EmptyView.h"
 #import "DualField.h"
-#import "TitlebarButton.h"
 #import "RBSplitView/RBSplitView.h"
 #import "BookmarksController.h"
-#import "SyncSessionController.h"
 #import "MultiplePageView.h"
-#import "InvocationRecorder.h"
 #import "LinearDividerShader.h"
 #import "SecureTextEntryManager.h"
 #import "TagEditingManager.h"
@@ -247,13 +243,17 @@ BOOL splitViewAwoke;
 	}
 	
 	currentPreviewMode = [[NSUserDefaults standardUserDefaults] integerForKey:@"markupPreviewMode"];
+    if (currentPreviewMode == TextilePreview) {
+        //Textile support was removed; carry anyone who used it over to MultiMarkdown
+        currentPreviewMode = MultiMarkdownPreview;
+        [[NSUserDefaults standardUserDefaults] setInteger:currentPreviewMode forKey:@"markupPreviewMode"];
+    }
     if (currentPreviewMode == MarkdownPreview) {
         [multiMarkdownPreview setState:NSOnState];
     } else if (currentPreviewMode == MultiMarkdownPreview) {
         [multiMarkdownPreview setState:NSOnState];
-    } else if (currentPreviewMode == TextilePreview) {
-        [textilePreview setState:NSOnState];
     }
+
 	
 	outletObjectAwoke(self);
 }
@@ -521,8 +521,6 @@ terminateApp:
     if (newNotation) {
 		if (notationController) {
 			[notationController closeAllResources];
-			[[NSNotificationCenter defaultCenter] removeObserver:self name:SyncSessionsChangedVisibleStatusNotification
-														  object:[notationController syncSessionController]];
 		}
 		
 		NotationController *oldNotation = notationController;
@@ -557,12 +555,6 @@ terminateApp:
 			[self _forceRegeneratePreviewsForTitleColumn];
 			[notesTableView setNeedsDisplay:YES];
 		}
-		[titleBarButton setMenu:[[notationController syncSessionController] syncStatusMenu]];
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(syncSessionsChangedVisibleStatus:)
-													 name:SyncSessionsChangedVisibleStatusNotification
-												   object:[notationController syncSessionController]];
-		[notationController performSelector:@selector(startSyncServices) withObject:nil afterDelay:0.0];
-		
 		if ([[notationController notationPrefs] secureTextEntry]) {
 			[[SecureTextEntryManager sharedInstance] enableSecureTextEntry];
 		} else {
@@ -602,7 +594,7 @@ terminateApp:
 	NSInteger numberSelected = [notesTableView numberOfSelectedRows];
 	NSInteger tag = [menuItem tag];
     
-    if ((tag == TextilePreview) || (tag == MarkdownPreview) || (tag == MultiMarkdownPreview)) {
+    if ((tag == MarkdownPreview) || (tag == MultiMarkdownPreview)) {
         // Allow only one Preview mode to be selected at every one time
         [menuItem setState:((tag == currentPreviewMode) ? NSOnState : NSOffState)];
         return YES;
@@ -2077,18 +2069,6 @@ terminateApp:
 	}
 }
 
-- (void)syncSessionsChangedVisibleStatus:(NSNotification*)aNotification {
-	SyncSessionController *syncSessionController = [aNotification object];
-	if ([syncSessionController hasErrors]) {
-		[titleBarButton setStatusIconType:AlertIcon];
-	} else if ([syncSessionController hasRunningSessions]) {
-		[titleBarButton setStatusIconType:SynchronizingIcon];
-	} else {
-		[titleBarButton setStatusIconType: [[NSUserDefaults standardUserDefaults] boolForKey:@"ShowSyncMenu"] ? DownArrowIcon : NoIcon ];
-	}
-}
-
-
 - (IBAction)fixFileEncoding:(id)sender {
 	if (currentNote) {
 		[notationController synchronizeNoteChanges:nil];
@@ -2109,42 +2089,6 @@ terminateApp:
     if ([prefsController quitWhenClosingWindow]){
 		[NSApp terminate:nil];
     }
-}
-
-- (void)_finishSyncWait {
-	//always post to next runloop to ensure that a sleep-delay response invocation, if one is also queued, runs before this one
-	//if the app quits before the sleep-delay response posts, then obviously sleep will be delayed by quite a bit
-	[self performSelector:@selector(syncWaitQuit:) withObject:nil afterDelay:0];
-}
-
-- (IBAction)syncWaitQuit:(id)sender {
-	//need this variable to allow overriding the wait
-	waitedForUncommittedChanges = YES;
-	NSString *errMsg = [[notationController syncSessionController] changeCommittingErrorMessage];
-	if ([errMsg length]) NSRunAlertPanel(NSLocalizedString(@"Changes could not be uploaded.", nil), errMsg, @"Quit", nil, nil);
-	
-	[NSApp terminate:nil];
-}
-
-- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
-	//if a sync session is still running, then wait for it to finish before sending terminatereply
-	//otherwise, if there are unsynced notes to send, then push them right now and wait until session is no longer running
-	//use waitForUncommitedChangesWithTarget:selector: and provide a callback to send NSTerminateNow
-	
-	InvocationRecorder *invRecorder = [InvocationRecorder invocationRecorder];
-	[[invRecorder prepareWithInvocationTarget:self] _finishSyncWait];
-	
-	if (!waitedForUncommittedChanges &&
-		[[notationController syncSessionController] waitForUncommitedChangesWithInvocation:[invRecorder invocation]]) {
-		
-		[[NSApp windows] makeObjectsPerformSelector:@selector(orderOut:) withObject:nil];
-		[syncWaitPanel center];
-		[syncWaitPanel makeKeyAndOrderFront:nil];
-		[syncWaitSpinner startAnimation:nil];
-		//use NSTerminateCancel instead of NSTerminateLater because we need the runloop functioning in order to receive start/stop sync notifications
-		return NSTerminateCancel;
-	}
-	return NSTerminateNow;
 }
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {
@@ -2538,8 +2482,6 @@ terminateApp:
 	[window setToolbar:toolbar];
 	
 	[window setShowsToolbarButton:NO];
-	titleBarButton = [[TitlebarButton alloc] initWithFrame:NSMakeRect(0, 0, 19.0, 19.0) pullsDown:YES];
-	[titleBarButton addToWindow:window];
 	
 	[field setDelegate:self];
     [self setDualFieldIsVisible:[self dualFieldIsVisible]];
@@ -2574,7 +2516,6 @@ terminateApp:
     [textView setNextKeyView:field];
     [self setDualFieldIsVisible:[self dualFieldIsVisible]];
     [toolbar release];
-    [titleBarButton release];
 }
 
 - (void)setDualFieldIsVisible:(BOOL)isVis{

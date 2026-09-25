@@ -33,7 +33,6 @@ extern NSString *NotationPrefsDidChangeNotification;
 	NSString *keychainDatabaseIdentifier;
 	
 	//password(s) stored in keychain or otherwise encrypted using notes password
-	NSMutableDictionary *syncServiceAccounts;
 	
 	unsigned int hashIterationCount, keyLengthInBits;
 	
@@ -75,13 +74,6 @@ NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serv
 - (NSInteger)notesStorageFormat;
 - (BOOL)confirmFileDeletion;
 - (BOOL)doesEncryption;
-- (NSDictionary*)syncServiceAccounts;
-- (NSDictionary*)syncServiceAccountsForArchiving;
-- (NSDictionary*)syncAccountForServiceName:(NSString*)serviceName;
-- (NSString*)syncPasswordForServiceName:(NSString*)serviceName;
-- (NSUInteger)syncFrequencyInMinutesForServiceName:(NSString*)serviceName;
-- (BOOL)syncNotesShouldMergeForServiceName:(NSString*)serviceName;
-- (BOOL)syncServiceIsEnabled:(NSString*)serviceName;
 - (unsigned int)keyLengthInBits;
 - (unsigned int)hashIterationCount;
 - (UInt32)epochIteration;
@@ -111,17 +103,9 @@ NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serv
 - (void)setConfirmsFileDeletion:(BOOL)value;
 - (void)setDoesEncryption:(BOOL)value;
 - (void)setSecureTextEntry:(BOOL)value;
-- (const char*)keychainSyncAccountNameForService:(NSString*)serviceName;
-- (void)setSyncUsername:(NSString*)username forService:(NSString*)serviceName;
-- (void)setSyncPassword:(NSString*)password forService:(NSString*)serviceName;
-- (void)setSyncFrequency:(NSUInteger)frequencyInMinutes forService:(NSString*)serviceName;
-- (void)setSyncEnabled:(BOOL)isEnabled forService:(NSString*)serviceName;
-- (void)setSyncShouldMerge:(BOOL)shouldMerge inCurrentAccountForService:(NSString*)serviceName;
-- (void)removeSyncPasswordForService:(NSString*)serviceName;
 - (void)setKeyLengthInBits:(unsigned int)newLength;
 
 - (NSUInteger)tableIndexOfDiskUUID:(CFUUIDRef)UUIDRef;
-- (void)checkForKnownRedundantSyncConduitsAtPath:(NSString*)dbPath;
 
 + (NSString*)pathExtensionForFormat:(NSInteger)format;
 
@@ -156,7 +140,6 @@ NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serv
 @interface NotationPrefs (DelegateMethods)
 
 - (void)databaseEncryptionSettingsChanged;
-- (void)syncSettingsChangedForService:(NSString*)serviceName;
 - (void)databaseSettingsChangedFromOldFormat:(NSInteger)oldFormat;
 
 @end

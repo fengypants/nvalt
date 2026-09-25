@@ -36,9 +36,7 @@
 #import "AlienNoteImporter.h"
 #import "ODBEditor.h"
 #import "NotationFileManager.h"
-#import "NotationSyncServiceManager.h"
 #import "NotationDirectoryManager.h"
-#import "SyncSessionController.h"
 #import "BookmarksController.h"
 #import "DeletionManager.h"
 #import "nvaDevConfig.h"
@@ -331,8 +329,6 @@ returnResult:
 	[self initializeDiskUUIDIfNecessary];
 	
 	[allNotes release];
-	
-	syncSessionController = [[SyncSessionController alloc] initWithSyncDelegate:self notationPrefs:notationPrefs];
 	
 	//frozennotation will work out passwords, keychains, decryption, etc...
 	if (!(allNotes = [[frozenNotation unpackedNotesReturningError:&err] retain])) {
@@ -749,7 +745,6 @@ bail:
 	[allNotes makeObjectsPerformSelector:@selector(abortEditingInExternalEditor)];
 	
 	[deletionManager cancelPanelReturningCode:NSRunStoppedResponse];
-	[self stopSyncServices];
 	[self stopFileNotifications];
 	if ([self flushAllNoteChanges])
 		[self closeJournal];
@@ -851,40 +846,9 @@ bail:
 	[self _addNote:newNote];
 	[newNote release];
 	
-	[self schedulePushToAllSyncServicesForNote:newNote];
-	
 	directoryChangesFound = YES;
 	
 	return newNote;
-}
-
-- (void)addNotesFromSync:(NSArray*)noteArray {
-	
-	if (![noteArray count]) return; 
-	
-	unsigned int i;
-	
-	if ([[self undoManager] isUndoing]) [undoManager beginUndoGrouping];
-	for (i=0; i<[noteArray count]; i++) {
-		NoteObject * note = [noteArray objectAtIndex:i];
-		
-		[self _addNote:note];
-		
-		[note makeNoteDirtyUpdateTime:NO updateFile:YES];
-		
-		//absolutely ensure that this note is pushed to the rest of the services
-		[note registerModificationWithOwnedServices];
-		[self schedulePushToAllSyncServicesForNote:note];
-	}
-	if ([[self undoManager] isUndoing]) [undoManager endUndoGrouping];
-	//don't need to reverse-register undo because removeNote/s: will never use this method
-	
-	[self updateTitlePrefixConnections];
-	
-	[self synchronizeNoteChanges:nil];
-		
-	[self resortAllNotes];
-	[self refilterNotes];
 }
 
 - (void)addNotes:(NSArray*)noteArray {
@@ -1115,12 +1079,6 @@ bail:
 		NSLog(@"Couldn't log note removal");
 	}
 	
-	//a removal command will be sent to sync services if aNoteObject contains a matching syncServicesMD dict 
-	//(e.g., already been synced at least once)
-	//make sure we use the same deleted note that was added to the list of deleted notes, to simplify record-keeping
-	//if the note didn't have metadata, try to sync it anyway so that the service knows this note shouldn't be created
-	[self schedulePushToAllSyncServicesForNote: deletedNote ? deletedNote : [DeletedNoteObject deletedNoteWithNote:aNoteObject]];
-    
 	[self _registerDeletionUndoForNote:aNoteObject];
 		
 	//delete note from bookmarks, too
@@ -1167,11 +1125,6 @@ bail:
 		return deletedNote;
 	}
 	return nil;
-}
-
-- (void)removeSyncMDFromDeletedNotesInSet:(NSSet*)notesToOrphan forService:(NSString*)serviceName {
-	NSMutableSet *matchingNotes = [deletedNotes setIntersectedWithSet:notesToOrphan];
-	[matchingNotes makeObjectsPerformSelector:@selector(removeAllSyncMDForService:) withObject:serviceName];
 }
 
 - (void)_registerDeletionUndoForNote:(NoteObject*)aNote {	
@@ -1589,10 +1542,6 @@ bail:
     return notesListDataSource;
 }
 
-- (SyncSessionController*)syncSessionController {
-	return syncSessionController;
-}
-
 - (void)dealloc {
  
 	[walWriter setDelegate:nil];
@@ -1616,7 +1565,6 @@ bail:
     [undoManager release];
     [notesListDataSource release];
     [labelsListController release];
-	[syncSessionController release];
 	[deletionManager release];
     [allNotes release];
 	[deletedNotes release];

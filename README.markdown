@@ -38,7 +38,8 @@ What changed from the original Intel build:
 - **Link detection** in notes uses the system's `NSDataDetector` instead of the Intel-only AutoHyperlinks framework.
 - **Sparkle** auto-updates are removed (the old feed serves the original Intel app). The "Check for Updates…" menu items are hidden.
 - **HTML import as Markdown** relied on bundled Python 2 scripts, and macOS no longer ships Python 2; HTML files now import as rich text.
-- **Textile** preview and **TaskPaper** conversion still use the system `perl` and `ruby`; if macOS stops shipping those, the preview says so instead of failing.
+- **Removed features:** Simplenote sync (including its preferences tab and title-bar status menu), the Textile preview mode, and "Share on Peg.gd" in the preview window. Databases that were synced with Simplenote still open; their old sync settings are ignored.
+- **TaskPaper** conversion in the preview still uses the system `ruby`; if macOS stops shipping it, TaskPaper notes render as plain MultiMarkdown.
 
 Preferences and notes are shared with the original nvALT (same bundle identifier, `net.elasticthreads.nv`).
 
@@ -56,7 +57,7 @@ nvALT adds:
 
 * Widescreen (horizontal) layout option
 * Shortcut (&#x2318;-&#x2325;-N) to collapse the notes panel
-* Markdown, Textile and MultiMarkdown support with Preview window
+* Markdown and MultiMarkdown support with Preview window
 * HTML source code tab in the Preview window for fast copy/paste to blogs, etc.
 * Unique interface design changes
 * Fixes for a couple of bugs/annoyances

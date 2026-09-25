@@ -25,7 +25,6 @@
 @class DualField;
 @class RBSplitView;
 @class RBSplitSubview;
-@class TitlebarButton;
 @class LinearDividerShader;
 @class TagEditingManager;
 @class DFView;
@@ -44,6 +43,7 @@
 #define MultiMarkdownPreview 13372
 #endif
 
+//no longer offered; kept so a saved Textile preference can be migrated
 #ifndef TextilePreview
 #define TextilePreview 13373
 #endif
@@ -83,13 +83,9 @@
 	IBOutlet EmptyView *editorStatusView;
 	IBOutlet NSMenuItem *sparkleUpdateItem;
     IBOutlet NSWindow *window;
-	IBOutlet NSPanel *syncWaitPanel;
-	IBOutlet NSProgressIndicator *syncWaitSpinner;
 	NSToolbar *toolbar;
 	NSToolbarItem *dualFieldItem;
-	TitlebarButton *titleBarButton;
 	
-	BOOL waitedForUncommittedChanges;
 	
     //	NSImage *verticalDividerImg;
 	LinearDividerShader *dividerShader;
@@ -115,7 +111,6 @@
     PreviewController *previewController;
     // IBOutlet NSMenuItem *markdownPreview;
     IBOutlet NSMenuItem *multiMarkdownPreview;
-    IBOutlet NSMenuItem *textilePreview;
     IBOutlet NSMenuItem *previewToggler;
     IBOutlet NSMenuItem *lockNoteItem;
     IBOutlet NSMenuItem *printPreviewItem;
@@ -165,7 +160,6 @@ void outletObjectAwoke(id sender);
 - (void)restoreListStateUsingPreferences;
 
 - (void)_finishSyncWait;
-- (IBAction)syncWaitQuit:(id)sender;
 
 - (void)setTableAllowsMultipleSelection;
 
