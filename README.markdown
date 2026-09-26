@@ -34,11 +34,11 @@ Builds are signed ad hoc ("Sign to Run Locally"), which is enough to run the app
 What changed from the original Intel build:
 
 - **Markdown/MultiMarkdown preview** is rendered in-process with cmark-gfm (tables, footnotes, strikethrough, task lists, autolinks, smart punctuation) instead of launching the bundled Intel `multimarkdown` 4.7 executable for every refresh. A leading MultiMarkdown metadata block (or YAML front matter) is hidden from the preview, and headers get MultiMarkdown-style `id`s.
-- **Encryption and hashing** use Apple's CommonCrypto instead of bundled 32/64-bit Intel OpenSSL libraries. The on-disk format is unchanged, so existing (encrypted) note databases open as before.
+- **Hashing and the crash-recovery journal** use Apple's CommonCrypto instead of bundled 32/64-bit Intel OpenSSL libraries. The on-disk format is unchanged.
 - **Link detection** in notes uses the system's `NSDataDetector` instead of the Intel-only AutoHyperlinks framework.
 - **Sparkle** auto-updates are removed (the old feed serves the original Intel app). The "Check for Updates…" menu items are hidden.
 - **HTML import as Markdown** relied on bundled Python 2 scripts, and macOS no longer ships Python 2; HTML files now import as rich text.
-- **Removed features:** Simplenote sync (including its preferences tab and title-bar status menu), the Textile preview mode, and "Share on Peg.gd" in the preview window. Databases that were synced with Simplenote still open; their old sync settings are ignored.
+- **Removed features:** note encryption (passphrases, keychain storage and the encryption controls in Preferences → Notes → Security; Secure Text Entry remains), Simplenote sync (including its preferences tab and title-bar status menu), the Textile preview mode, and "Share on Peg.gd" in the preview window. Databases that were synced with Simplenote still open; their old sync settings are ignored. **An encrypted database will not open**: turn encryption off in the previous version of nvALT first.
 - **TaskPaper** conversion in the preview still uses the system `ruby`; if macOS stops shipping it, TaskPaper notes render as plain MultiMarkdown.
 
 Preferences and notes are shared with the original nvALT (same bundle identifier, `net.elasticthreads.nv`).

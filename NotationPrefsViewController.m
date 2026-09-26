@@ -18,12 +18,9 @@
 
 #import "GlobalPrefs.h"
 #import "NotationPrefsViewController.h"
-#import "InvocationRecorder.h"
 #import "NotationPrefs.h"
 #import "NSString_NV.h"
 #import "NSCollection_utils.h"
-#import "PassphrasePicker.h"
-#import "PassphraseChanger.h"
 #import "NSFileManager_NV.h"
 //#import "AppController.h"
 
@@ -58,8 +55,6 @@
 		didAwakeFromNib = NO;
 		notationPrefs = [[[GlobalPrefs defaultPrefs] notationPrefs] retain];
 		
-		disableEncryptionString = NSLocalizedString(@"Turn Off Note Encryption...",nil);
-		enableEncryptionString = NSLocalizedString(@"Turn On Note Encryption...",nil);
 	
 		[[GlobalPrefs defaultPrefs] registerForSettingChange:@selector(setNotationPrefs:sender:) withTarget:self];
     
@@ -68,10 +63,7 @@
 	return nil;
 }
 - (void)dealloc {
-	[picker release];
-	[changer release];
 	[notationPrefs release];
-	[postStorageFormatInvocation release];
 	
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	
@@ -87,6 +79,7 @@
 	
 	
 	[self removeSynchronizationTab];
+	[self removeEncryptionControls];
 	
 	NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
 	[center addObserver:self selector:@selector(initializeControls) name:NotationPrefsDidChangeNotification object:nil];
@@ -117,10 +110,6 @@
 	
 	if ([selectorString isEqualToString:SEL_STR(setNotationPrefs:sender:)]) {
 		
-		//force these objects to re-init with the new notationprefs
-		[changer release]; changer = nil;
-		[picker release]; picker = nil;
-		
 		[notationPrefs release];
 		notationPrefs = [[[GlobalPrefs defaultPrefs] notationPrefs] retain];
 		
@@ -133,11 +122,7 @@
     //set up outlets to reflect new settings
     if (notationPrefs) {
 		
-		[keyLengthField setIntValue:[notationPrefs keyLengthInBits]];
-		[keyLengthStepper setIntValue:[notationPrefs keyLengthInBits]];
-		[self setEncryptionControlsState:[notationPrefs doesEncryption]];
 		[self setSeparateFileControlsState:[notationPrefs notesStorageFormat]];
-		[self updateRemoveKeychainItemStatus];
 		[confirmFileDeletionButton setState:[notationPrefs confirmFileDeletion]];
 		
 		[secureTextEntryButton setState:[notationPrefs secureTextEntry]];
@@ -166,16 +151,43 @@
 	}
 }
 
-- (void)setEncryptionControlsState:(BOOL)encryptionState {
-    [enableEncryptionButton setTitle:(encryptionState ? disableEncryptionString : enableEncryptionString)];
-    [changePasswordButton setEnabled:encryptionState];
-	[passwordSettingsMatrix setEnabled:encryptionState];
+//note encryption was removed; its controls share the nib's "Security" tab with Secure Text Entry, so hide
+//them (their outlets stay declared because the compiled nib connects them) and move the Secure Text Entry
+//row (its checkbox plus the labels beside and beneath it) to the top of the tab
+- (void)removeEncryptionControls {
+	NSView *securityView = [secureTextEntryButton superview];
+	if (!securityView) return;
 	
-	[passwordSettingsMatrix setState:[notationPrefs storesPasswordInKeychain] atRow:0 column:0];
-	[passwordSettingsMatrix setState:![notationPrefs storesPasswordInKeychain] atRow:1 column:0];
+	NSRect entryFrame = [secureTextEntryButton frame];
+	NSArray *encryptionControls = [NSArray arrayWithObjects:enableEncryptionButton, changePasswordButton, passwordSettingsMatrix,
+								   keyLengthStepper, keyLengthField, removeFromKeychainButton, nil];
+	CGFloat topEdge = 0.0, keptTopEdge = 0.0;
+	NSMutableArray *keptViews = [NSMutableArray array];
 	
-    [keyLengthField setEnabled:encryptionState];
-    [keyLengthStepper setEnabled:encryptionState];
+	for (NSView *subview in [securityView subviews]) {
+		NSRect frame = [subview frame];
+		topEdge = MAX(topEdge, NSMaxY(frame));
+		
+		BOOL inSecureEntryRow = NSMidY(frame) >= NSMinY(entryFrame) - 40.0 && NSMidY(frame) <= NSMaxY(entryFrame) + 10.0;
+		if (subview == secureTextEntryButton || (inSecureEntryRow && ![encryptionControls containsObject:subview])) {
+			[keptViews addObject:subview];
+			keptTopEdge = MAX(keptTopEdge, NSMaxY(frame));
+		} else {
+			[subview setHidden:YES];
+		}
+	}
+	
+	CGFloat offset = topEdge - keptTopEdge;
+	if ([securityView isFlipped]) offset = -offset;
+	for (NSView *subview in keptViews) {
+		[subview setFrameOrigin:NSMakePoint(NSMinX([subview frame]), NSMinY([subview frame]) + offset)];
+	}
+	
+	//the single-database menu item was titled "Single Database (Allow Encryption)"
+	NSMenuItem *databaseItem = [[storageFormatPopupButton menu] itemWithTag:SingleDatabaseFormat];
+	NSRange parenthetical = [[databaseItem title] rangeOfString:@" ("];
+	if (parenthetical.location != NSNotFound)
+		[databaseItem setTitle:[[databaseItem title] substringToIndex:parenthetical.location]];
 }
 
 - (void)setSeparateFileControlsState:(BOOL)separateFileControlsState {
@@ -193,18 +205,6 @@
 	[storageFormatPopupButton selectItemWithTag:[notationPrefs notesStorageFormat]];
 	
 	[fileAttributesHelpText setTextColor: separateFileControlsState ? [NSColor controlTextColor] : [NSColor grayColor]];	
-}
-
-- (void)updateRemoveKeychainItemStatus {
-	
-	if (![removeFromKeychainButton isHidden]) {
-		SecKeychainItemRef itemRef = [notationPrefs currentKeychainItem];
-		
-		[removeFromKeychainButton setEnabled:(itemRef != NULL)];
-		
-		if (itemRef)
-			CFRelease(itemRef);
-	}
 }
 
 - (void)tableView:(NSTableView *)aTableView setObjectValue:(id)anObject 
@@ -265,40 +265,12 @@
 
 }
 
-- (IBAction)changedKeyLength:(id)sender {
-    
-    int bits = [keyLengthStepper intValue];
-    [keyLengthField setIntValue:bits];
-    [notationPrefs setKeyLengthInBits:bits];
-}
-
-- (IBAction)changedKeychainSettings:(id)sender {
-	//matrix does not change until the next runloop iteration, apparently
-	if (sender != self)
-		[self performSelector:@selector(changedKeychainSettings:) withObject:self afterDelay:0.0];
-	else
-		[notationPrefs setStoresPasswordInKeychain:[[passwordSettingsMatrix cellAtRow:0 column:0] state]];
-		
-}
-
 - (IBAction)changedFileDeletionWarningSettings:(id)sender {
     [notationPrefs setConfirmsFileDeletion:[confirmFileDeletionButton state]];
 }
 
-- (IBAction)removeFromKeychain:(id)sender {
-	[notationPrefs removeKeychainData];
-
-	[self updateRemoveKeychainItemStatus];
-}
-
 - (NSInteger)notesStorageFormatInProgress {
 	return notesStorageFormatInProgress;
-}
-
-- (void)runQueuedStorageFormatChangeInvocation {
-	[postStorageFormatInvocation performSelector:@selector(invoke) withObject:nil afterDelay:0.0];
-	[postStorageFormatInvocation release];
-	postStorageFormatInvocation = nil;
 }
 
 - (void)notesStorageFormatDidChange {
@@ -310,22 +282,7 @@
 }
 
 - (IBAction)changedFileStorageFormat:(id)sender {
-    NSInteger storageTag = [storageFormatPopupButton selectedTag];
-	if (storageTag != SingleDatabaseFormat && [notationPrefs doesEncryption]) {
-		if (NSRunAlertPanel(NSLocalizedString(@"Encryption is currently on, but storing notes individually requires it to be off. Disable encryption?",nil),
-							NSLocalizedString(@"Warning: Your notes will be written to disk in clear text.",nil), NSLocalizedString(@"Disable Encryption",nil), 
-							NSLocalizedString(@"Cancel",nil), NULL) == NSAlertDefaultReturn) {
-			
-			//disable encryption
-			[self disableEncryptionWithWarning:NO];
-		} else {
-			//cancelled
-			[self notesStorageFormatDidChange];
-			return;
-		}
-	}
-	
-	notesStorageFormatInProgress = storageTag;
+	notesStorageFormatInProgress = [storageFormatPopupButton selectedTag];
 	
 	//if we're changing to a database format from a non-database-format, ask to trash existing files
     if ([notationPrefs shouldDisplaySheetForProposedFormat:notesStorageFormatInProgress]) {
@@ -342,9 +299,6 @@
 		//just call setNotesStorageFormat straight-out
 		[notationPrefs setNotesStorageFormat:notesStorageFormatInProgress];
 		[self notesStorageFormatDidChange];
-		
-		//sheet ending will not do this for us--there is no sheet
-		[self runQueuedStorageFormatChangeInvocation];
 	}
 	
 	
@@ -364,14 +318,6 @@
 
 - (IBAction)changedSecureTextEntry:(id)sender {
 	[notationPrefs setSecureTextEntry:[secureTextEntryButton state]];
-}
-
-- (IBAction)changePassphrase:(id)sender {
-	
-	NSAssert([notationPrefs doesEncryption], @"Encryption must be on before the password can be changed.");
-	
-	if (!changer) changer = [[PassphraseChanger alloc] initWithNotationPrefs:notationPrefs];
-	[changer showAroundWindow:[view window]];
 }
 
 - (IBAction)makeDefaultExtension:(id)sender {
@@ -403,99 +349,6 @@
 	
 	[allowedTypesTable reloadData];
 }
-
-- (void)passphrasePicker:(PassphrasePicker*)picker choseAPassphrase:(BOOL)success {
-	
-	[self setEncryptionControlsState:success];
-	[notationPrefs setDoesEncryption:success];
-	[self updateRemoveKeychainItemStatus];
-}
-
-- (void)encryptionFormatMismatchSheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {
-	if (returnCode == NSAlertDefaultReturn) {
-		//switching to single DB
-		[storageFormatPopupButton selectItemWithTag:SingleDatabaseFormat];
-		
-		[self performSelector:@selector(changedFileStorageFormat:) withObject:storageFormatPopupButton afterDelay:0.0];
-		
-		//need to show PW picker dialog after this ->
-		
-		//[picker showAroundWindow:[view window] resultDelegate:self];
-		
-		[postStorageFormatInvocation release];
-		
-		//so queue it up:
-		InvocationRecorder *invRecorder = [InvocationRecorder invocationRecorder];
-		[[invRecorder prepareWithInvocationTarget:picker] showAroundWindow:[view window] resultDelegate:self];
-		postStorageFormatInvocation = [[invRecorder invocation] retain];
-	}
-}
-
-- (void)enableEncryption {
-	if (!picker) picker = [[PassphrasePicker alloc] initWithNotationPrefs:notationPrefs];
-	
-	NSInteger format = [notationPrefs notesStorageFormat];
-	if (format == SingleDatabaseFormat) {
-		
-		[picker showAroundWindow:[view window] resultDelegate:self];
-	} else {
-		NSString *formatStrings[] = { NSLocalizedString(@"(WHAT??)",@"user shouldn't see this"), 
-			NSLocalizedString(@"plain text",nil), NSLocalizedString(@"rich text",nil), NSLocalizedString(@"HTML",nil) };
-		NSAlert *alert = [NSAlert alertWithMessageText:[NSString stringWithFormat:NSLocalizedString(@"Your notes are currently stored as %@ files on disk, but encryption requires a single database. Switch to a database format?",nil), formatStrings[format]]
-										 defaultButton:NSLocalizedString(@"Use a single database file",nil) alternateButton:NSLocalizedString(@"Cancel",nil) otherButton:nil
-							 informativeTextWithFormat:NSLocalizedString(@"Notational Velocity supports encryption only for notes stored in a database file.",nil)];
-		
-		[alert beginSheetModalForWindow:[view window] modalDelegate:self 
-						 didEndSelector:@selector(encryptionFormatMismatchSheetDidEnd:returnCode:contextInfo:) contextInfo:NULL];
-	}
-}
-
-- (void)disableEncryptionWarningSheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo {
-	if (returnCode == NSAlertDefaultReturn) {
-		[self _disableEncryption];
-	}
-}
-
-- (void)_disableEncryption {
-	[self setEncryptionControlsState:NO];
-	[notationPrefs setDoesEncryption:NO];
-	[self updateRemoveKeychainItemStatus];
-	
-	[picker release]; picker = nil;		
-}
-
-- (void)disableEncryptionWithWarning:(BOOL)warning {
-	if ([notationPrefs doesEncryption]) {
-		if (warning) {
-			NSAlert *alert = [NSAlert alertWithMessageText:NSLocalizedString(@"Disable note encryption now?",nil)
-											 defaultButton:NSLocalizedString(@"Disable Encryption",@"button title for disabling note encryption") 
-										   alternateButton:NSLocalizedString(@"Cancel",nil) otherButton:nil
-								 informativeTextWithFormat:NSLocalizedString(@"Warning: Your notes will be written to disk in clear text.",nil)];
-			
-			[alert beginSheetModalForWindow:[view window] modalDelegate:self 
-							 didEndSelector:@selector(disableEncryptionWarningSheetDidEnd:returnCode:contextInfo:) contextInfo:NULL];
-			
-		} else {
-			[self _disableEncryption];
-		}
-		
-	} else {
-		NSLog(@"Not disabling encryption because it is already off.");
-	}
-}
-
-- (IBAction)toggledEncryption:(id)sender {
-	BOOL encryptionOn = ![notationPrefs doesEncryption];
-	
-	if (encryptionOn) {
-		[self enableEncryption];
-	} else {
-		[self disableEncryptionWithWarning:YES];
-	}
-}
-
-
-#pragma mark nvALT Finder tagging
 
 - (IBAction)switchToFinderTags:(id)sender{
     if (IsMavericksOrLater) {

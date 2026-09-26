@@ -20,7 +20,7 @@
 #import "NotationController.h"
 
 /* this class is responsible for managing all preferences specific to a notational database,
-including encryption, file formats, synchronization, passwords management, and others */
+such as file formats and secure text entry */
 
 #define EPOC_ITERATION 4
 
@@ -29,12 +29,7 @@ enum { SingleDatabaseFormat = 0, PlainTextFormat, RTFTextFormat, HTMLFormat, Wor
 extern NSString *NotationPrefsDidChangeNotification;
 
 @interface NotationPrefs : NSObject {
-	BOOL doesEncryption, storesPasswordInKeychain, secureTextEntry;
-	NSString *keychainDatabaseIdentifier;
-	
-	//password(s) stored in keychain or otherwise encrypted using notes password
-	
-	unsigned int hashIterationCount, keyLengthInBits;
+	BOOL databaseIsEncrypted, secureTextEntry;
 	
 	NSColor *foregroundColor;
 	NSFont *baseBodyFont;
@@ -45,21 +40,13 @@ extern NSString *NotationPrefsDidChangeNotification;
     NSMutableArray *typeStrings[4], *pathExtensions[4];
     OSType *allowedTypes;
 	
-	NSData *masterSalt, *dataSessionSalt, *verifierKey;
-	
 	NSMutableArray *seenDiskUUIDEntries;
 	
 	UInt32 epochIteration;
 	BOOL firstTimeUsed;
 	BOOL preferencesChanged;
 	id delegate;
-	
-	@private 
-	//masterKey is not to be stored anywhere
-	NSData *masterKey;
 }
-
-NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serviceName);
 
 + (int)appVersion;
 + (NSMutableArray*)defaultTypeStringsForFormat:(int)formatID;
@@ -70,40 +57,21 @@ NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serv
 - (void)setBaseBodyFont:(NSFont*)aFont;
 - (NSFont*)baseBodyFont;
 
-- (BOOL)storesPasswordInKeychain;
 - (NSInteger)notesStorageFormat;
 - (BOOL)confirmFileDeletion;
-- (BOOL)doesEncryption;
-- (unsigned int)keyLengthInBits;
-- (unsigned int)hashIterationCount;
+- (BOOL)databaseIsEncrypted;
 - (UInt32)epochIteration;
 - (BOOL)firstTimeUsed;
 - (BOOL)secureTextEntry;
 
-- (void)forgetKeychainIdentifier;
-- (const char *)setKeychainIdentifier;
-- (SecKeychainItemRef)currentKeychainItem;
-- (NSData*)passwordDataFromKeychain;
-- (void)removeKeychainData;
-- (void)setKeychainData:(NSData*)data;
-
 - (void)setPreferencesAreStored;
-- (void)setStoresPasswordInKeychain:(BOOL)value;
-- (BOOL)canLoadPassphraseData:(NSData*)passData;
-- (BOOL)canLoadPassphrase:(NSString*)pass;
-- (void)setPassphraseData:(NSData*)passData inKeychain:(BOOL)inKeychain;
-- (void)setPassphraseData:(NSData*)passData inKeychain:(BOOL)inKeychain withIterations:(int)iterationCount;
-- (BOOL)encryptDataInNewSession:(NSMutableData*)data;
-- (BOOL)decryptDataWithCurrentSettings:(NSMutableData*)data;
 - (NSData*)WALSessionKey;
 
 - (void)setNotesStorageFormat:(NSInteger)formatID;
 - (BOOL)shouldDisplaySheetForProposedFormat:(NSInteger)proposedFormat;
 - (void)noteFilesCleanupSheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo;
 - (void)setConfirmsFileDeletion:(BOOL)value;
-- (void)setDoesEncryption:(BOOL)value;
 - (void)setSecureTextEntry:(BOOL)value;
-- (void)setKeyLengthInBits:(unsigned int)newLength;
 
 - (NSUInteger)tableIndexOfDiskUUID:(CFUUIDRef)UUIDRef;
 
@@ -139,7 +107,6 @@ NSMutableDictionary *ServiceAccountDictInit(NotationPrefs *prefs, NSString* serv
 
 @interface NotationPrefs (DelegateMethods)
 
-- (void)databaseEncryptionSettingsChanged;
 - (void)databaseSettingsChangedFromOldFormat:(NSInteger)oldFormat;
 
 @end

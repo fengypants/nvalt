@@ -30,8 +30,6 @@
 #import "NotationController.h"
 #import "NoteObject.h"
 
-NSString *PasswordWasRetrievedFromKeychainKey = @"PasswordRetrievedFromKeychain";
-NSString *RetrievedPasswordKey = @"RetrievedPassword";
 NSString *ShouldImportCreationDates = @"ShouldImportCreationDates";
 
 @interface AlienNoteImporter (Private)
@@ -60,12 +58,8 @@ NSString *ShouldImportCreationDates = @"ShouldImportCreationDates";
 		AlienNoteImporter *importer = [AlienNoteImporter importerWithPath:[AlienNoteImporter blorPath]];
 		NSArray *noteArray = [importer importedNotes];
 		if ([noteArray count] > 0) {
+			//notes from a Notational Velocity 1.x database are imported unencrypted (note encryption was removed)
 			NSLog(@"importing BLOR");
-			NSData *passData = [[[importer documentSettings] objectForKey:RetrievedPasswordKey] dataUsingEncoding:NSUTF8StringEncoding];
-			BOOL shouldStoreInKeychain = [[[importer documentSettings] objectForKey:PasswordWasRetrievedFromKeychainKey] boolValue];
-			[prefs setPassphraseData:passData inKeychain:shouldStoreInKeychain];
-			[prefs setDoesEncryption:YES];
-			
 			[notation addNotes:noteArray];
 		} else {
 			//add localized RTF help notes (how do we handle initializing a new NV copy when the owner just wants to re-sync from web? they will get new help notes each time?)
@@ -590,10 +584,6 @@ NSString *ShouldImportCreationDates = @"ShouldImportCreationDates";
 		NSLog(@"Couldn't get a valid pass-key to decrypt the blor!");
 		return nil;
 	}
-	
-	[documentSettings setObject:[NSNumber numberWithBool:[retriever canRetrieveFromKeychain]]
-						 forKey:PasswordWasRetrievedFromKeychainKey];
-	[documentSettings setObject:[retriever originalPasswordString] forKey:RetrievedPasswordKey];
 	
     NSDictionary *dbAttrs = [[NSFileManager defaultManager]attributesAtPath:filename followLink:YES];
     //[[NSFileManager defaultManager] fileAttributesAtPath:filename traverseLink:YES];

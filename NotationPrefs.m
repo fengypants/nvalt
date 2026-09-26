@@ -29,10 +29,7 @@
 #include <Security/Security.h>
 #include <ApplicationServices/ApplicationServices.h>
 
-#define DEFAULT_HASH_ITERATIONS 8000
-#define DEFAULT_KEY_LENGTH 256
 
-#define KEYCHAIN_SERVICENAME "Notational Velocity"
 
 NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotification";
 
@@ -54,11 +51,9 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 		}
 		
 		confirmFileDeletion = YES;
-		storesPasswordInKeychain = secureTextEntry = doesEncryption = NO;
+		secureTextEntry = databaseIsEncrypted = NO;
 		seenDiskUUIDEntries = [[NSMutableArray alloc] init];
 		notesStorageFormat = SingleDatabaseFormat;
-		hashIterationCount = DEFAULT_HASH_ITERATIONS;
-		keyLengthInBits = DEFAULT_KEY_LENGTH;
 		baseBodyFont = [[[GlobalPrefs defaultPrefs] noteBodyFont] retain];
 		//foregroundColor = [[[GlobalPrefs defaultPrefs] foregroundTextColor] retain];
 		foregroundColor = [[[NSApp delegate] foregrndColor]retain];
@@ -84,14 +79,12 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 		
 		epochIteration = [decoder decodeInt32ForKey:VAR_STR(epochIteration)];
 		notesStorageFormat = [decoder decodeIntForKey:VAR_STR(notesStorageFormat)];
-		doesEncryption = [decoder decodeBoolForKey:VAR_STR(doesEncryption)];
-		storesPasswordInKeychain = [decoder decodeBoolForKey:VAR_STR(storesPasswordInKeychain)];
 		secureTextEntry = [decoder decodeBoolForKey:VAR_STR(secureTextEntry)];
 		
-		if (!(hashIterationCount = [decoder decodeIntForKey:VAR_STR(hashIterationCount)]))
-			hashIterationCount = DEFAULT_HASH_ITERATIONS;
-		if (!(keyLengthInBits = [decoder decodeIntForKey:VAR_STR(keyLengthInBits)]))
-			keyLengthInBits = DEFAULT_KEY_LENGTH;
+		//note encryption is no longer supported; remember whether this database was encrypted by an earlier
+		//version (as that version decided it) so that loading can stop instead of misreading the notes
+		databaseIsEncrypted = [decoder decodeBoolForKey:@"doesEncryption"] &&
+			[decoder decodeObjectForKey:@"verifierKey"] && [decoder decodeObjectForKey:@"masterSalt"];
 		
 		@try {
 			baseBodyFont = [[decoder decodeObjectForKey:VAR_STR(baseBodyFont)] retain];
@@ -128,17 +121,11 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 			chosenExtIndices[i] = [decoder decodeIntForKey:[VAR_STR(chosenExtIndices) stringByAppendingFormat:@".%d",i]];
 		}
 		
-		//databases from earlier versions may also contain "syncServiceAccounts" (Simplenote settings); it is ignored
-		keychainDatabaseIdentifier = [[decoder decodeObjectForKey:VAR_STR(keychainDatabaseIdentifier)] retain];
+		//databases from earlier versions may also contain "syncServiceAccounts" (Simplenote settings) and
+		//keychain/key-derivation settings for encryption; they are ignored
 		
 		if (!(seenDiskUUIDEntries = [[decoder decodeObjectForKey:VAR_STR(seenDiskUUIDEntries)] retain]))
 			seenDiskUUIDEntries = [[NSMutableArray alloc] init];
-		
-		masterSalt = [[decoder decodeObjectForKey:VAR_STR(masterSalt)] retain];
-		dataSessionSalt = [[decoder decodeObjectForKey:VAR_STR(dataSessionSalt)] retain];
-		verifierKey = [[decoder decodeObjectForKey:VAR_STR(verifierKey)] retain];
-		
-		doesEncryption = doesEncryption && verifierKey && masterSalt;
 		
 		[self updateOSTypesArray];
     }
@@ -159,10 +146,6 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 	[coder encodeInt32:EPOC_ITERATION forKey:VAR_STR(epochIteration)];
 	
 	[coder encodeInteger:notesStorageFormat forKey:VAR_STR(notesStorageFormat)];
-	[coder encodeBool:doesEncryption forKey:VAR_STR(doesEncryption)];
-	[coder encodeBool:storesPasswordInKeychain forKey:VAR_STR(storesPasswordInKeychain)];
-	[coder encodeInt:hashIterationCount forKey:VAR_STR(hashIterationCount)];
-	[coder encodeInt:keyLengthInBits forKey:VAR_STR(keyLengthInBits)];
 	[coder encodeBool:secureTextEntry forKey:VAR_STR(secureTextEntry)];
 	
 	[coder encodeBool:confirmFileDeletion forKey:VAR_STR(confirmFileDeletion)];
@@ -176,13 +159,7 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 		[coder encodeInt:chosenExtIndices[i] forKey:[VAR_STR(chosenExtIndices) stringByAppendingFormat:@".%d",i]];
 	}
 	
-	[coder encodeObject:keychainDatabaseIdentifier forKey:VAR_STR(keychainDatabaseIdentifier)];
-	
 	[coder encodeObject:seenDiskUUIDEntries forKey:VAR_STR(seenDiskUUIDEntries)];
-	
-	[coder encodeObject:masterSalt forKey:VAR_STR(masterSalt)];
-	[coder encodeObject:dataSessionSalt forKey:VAR_STR(dataSessionSalt)];
-	[coder encodeObject:verifierKey forKey:VAR_STR(verifierKey)];
 }
 
 
@@ -197,7 +174,6 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 	free(allowedTypes);
 	
 	[seenDiskUUIDEntries release];
-	[keychainDatabaseIdentifier release];
 	[baseBodyFont release];
 	[foregroundColor release];
     
@@ -249,10 +225,6 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 	return preferencesChanged;
 }
 
-- (BOOL)storesPasswordInKeychain {
-	return storesPasswordInKeychain;
-}
-
 - (NSInteger)notesStorageFormat {
 	return notesStorageFormat;
 }
@@ -260,20 +232,12 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
     return confirmFileDeletion;
 }
 
-- (BOOL)doesEncryption {
-	return doesEncryption;
+- (BOOL)databaseIsEncrypted {
+	return databaseIsEncrypted;
 }
 
 - (BOOL)secureTextEntry {
 	return secureTextEntry;
-}
-
-- (unsigned int)keyLengthInBits {
-    return keyLengthInBits;
-}
-
-- (unsigned int)hashIterationCount {
-	return hashIterationCount;
 }
 
 - (void)setPreferencesAreStored {
@@ -311,202 +275,11 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 	return baseBodyFont;
 }
 
-- (void)forgetKeychainIdentifier {
-	
-	[keychainDatabaseIdentifier release];
-	keychainDatabaseIdentifier = nil;
-	
-	preferencesChanged = YES;
-}
-
-- (const char *)setKeychainIdentifier {
-	if (!keychainDatabaseIdentifier) {
-		CFUUIDRef uuidRef = CFUUIDCreate(kCFAllocatorDefault);
-		keychainDatabaseIdentifier = (NSString*)CFUUIDCreateString(kCFAllocatorDefault, uuidRef);
-		CFRelease(uuidRef);
-
-		preferencesChanged = YES;
-	}
-	
-	return [keychainDatabaseIdentifier UTF8String];
-}
-
-- (SecKeychainItemRef)currentKeychainItem {
-	SecKeychainItemRef returnedItem = NULL;
-	
-	const char *accountName = [self setKeychainIdentifier];
-	
-	OSStatus err = SecKeychainFindGenericPassword(NULL, strlen(KEYCHAIN_SERVICENAME), KEYCHAIN_SERVICENAME,
-											 strlen(accountName), accountName, NULL, NULL, &returnedItem);
-	if (err != noErr)
-		return NULL;
-	
-	return returnedItem;
-}
-
-- (void)removeKeychainData {
-	SecKeychainItemRef itemRef = [self currentKeychainItem];
-	if (itemRef) {
-		OSStatus err = SecKeychainItemDelete(itemRef);
-		if (err != noErr)
-			NSLog(@"Error deleting keychain item: %d", err);
-		CFRelease(itemRef);
-	}
-}
-
-- (NSData*)passwordDataFromKeychain {
-	void *passwordData = NULL;
-	UInt32 passwordLength = 0;
-	const char *accountName = [self setKeychainIdentifier];
-	SecKeychainItemRef returnedItem = NULL;	
-	
-	OSStatus err = SecKeychainFindGenericPassword(NULL,
-												  strlen(KEYCHAIN_SERVICENAME), KEYCHAIN_SERVICENAME,
-												  strlen(accountName), accountName,
-												  &passwordLength, &passwordData,
-												  &returnedItem);
-	if (err != noErr) {
-		NSLog(@"Error finding keychain password for account %s: %d\n", accountName, err);
-		return nil;
-	}
-	NSData *data = [NSData dataWithBytes:passwordData length:passwordLength];
-	
-	bzero(passwordData, passwordLength);
-	
-	SecKeychainItemFreeContent(NULL, passwordData);
-	
-	return data;
-}
-
-- (void)setKeychainData:(NSData*)data {
-	
-	OSStatus status = noErr;
-	
-	SecKeychainItemRef itemRef = [self currentKeychainItem];
-	if (itemRef) {
-		//modify existing data; item already exists
-		
-		const char *accountName = [self setKeychainIdentifier];
-		
-		SecKeychainAttribute attrs[] = {
-		{ kSecAccountItemAttr, strlen(accountName), (char*)accountName },
-		{ kSecServiceItemAttr, strlen(KEYCHAIN_SERVICENAME), (char*)KEYCHAIN_SERVICENAME } };
-		
-		const SecKeychainAttributeList attributes = { sizeof(attrs) / sizeof(attrs[0]), attrs };
-		
-		if (noErr != (status = SecKeychainItemModifyAttributesAndData(itemRef, &attributes, [data length], [data bytes]))) {
-			NSLog(@"Error modifying keychain data with new passphrase-data: %d", status);
-		}
-		
-		CFRelease(itemRef);
-		
-	} else {
-		const char *accountName = [self setKeychainIdentifier];
-		
-		//add new data; item does not exist
-		if (noErr != (status = SecKeychainAddGenericPassword(NULL, strlen(KEYCHAIN_SERVICENAME), KEYCHAIN_SERVICENAME,
-															 strlen(accountName), accountName, [data length], [data bytes], NULL))) {
-			NSLog(@"Error adding new passphrase item to keychain: %d", status);
-		}
-	}
-}
-
-- (void)setStoresPasswordInKeychain:(BOOL)value {
-	storesPasswordInKeychain = value;
-	preferencesChanged = YES;
-	
-	if (!storesPasswordInKeychain)
-		[self removeKeychainData];
-}
-
-- (BOOL)canLoadPassphraseData:(NSData*)passData {
-	
-	int keyLength = keyLengthInBits/8;
-	
-	//compute master key given stored salt and # of iterations
-	NSData *computedMasterKey = [passData derivedKeyOfLength:keyLength salt:masterSalt iterations:hashIterationCount];
-
-	//compute verify key given "verify" salt and 1 iteration
-	NSData *verifySalt = [NSData dataWithBytesNoCopy:VERIFY_SALT length:sizeof(VERIFY_SALT) freeWhenDone:NO];
-	NSData *computedVerifyKey = [computedMasterKey derivedKeyOfLength:keyLength salt:verifySalt iterations:1];
-	
-	//check against verify key data
-	if ([computedVerifyKey isEqualToData:verifierKey]) {
-		//if computedMasterKey is good, and we don't already have a master key, then this is it
-		if (!masterKey)
-			masterKey = [computedMasterKey retain];
-		
-		return YES;
-	}
-	
-	return NO;
-	
-}
-
-- (BOOL)canLoadPassphrase:(NSString*)pass {
-	return [self canLoadPassphraseData:[pass dataUsingEncoding:NSUTF8StringEncoding]];
-}
-
-- (BOOL)encryptDataInNewSession:(NSMutableData*)data {
-	//ideally we would vary AES algo between 128 and 256 bits depending on key length, 
-	//and scale beyond with triplets, quintuplets, and septuplets--but key is not currently user-settable
-
-	//create new dataSessionSalt and key here
-	[dataSessionSalt release];
-	dataSessionSalt = [[NSData randomDataOfLength:256] retain];
-	
-	NSData *dataSessionKey = [masterKey derivedKeyOfLength:keyLengthInBits/8 salt:dataSessionSalt iterations:1];
-	
-	return [data encryptAESDataWithKey:dataSessionKey iv:[dataSessionSalt subdataWithRange:NSMakeRange(0, 16)]];
-}
-- (BOOL)decryptDataWithCurrentSettings:(NSMutableData*)data {
-	
-	NSData *dataSessionKey = [masterKey derivedKeyOfLength:keyLengthInBits/8 salt:dataSessionSalt iterations:1];
-	
-	return [data decryptAESDataWithKey:dataSessionKey iv:[dataSessionSalt subdataWithRange:NSMakeRange(0, 16)]];
-}
-
-- (void)setPassphraseData:(NSData*)passData inKeychain:(BOOL)inKeychain {
-	[self setPassphraseData:passData inKeychain:inKeychain withIterations:hashIterationCount];
-}
-
-- (void)setPassphraseData:(NSData*)passData inKeychain:(BOOL)inKeychain withIterations:(int)iterationCount {
-	
-	hashIterationCount = iterationCount;
-	int keyLength = keyLengthInBits/8;
-	
-	//generate and set random salt
-	[masterSalt release];
-	masterSalt = [[NSData randomDataOfLength:256] retain];
-
-	//compute and set master key given salt and # of iterations
-	[masterKey release];
-	masterKey = [[passData derivedKeyOfLength:keyLength salt:masterSalt iterations:hashIterationCount] retain];
-	
-	//compute and set verify key from master key
-	[verifierKey release];
-	NSData *verifySalt = [NSData dataWithBytesNoCopy:VERIFY_SALT length:sizeof(VERIFY_SALT) freeWhenDone:NO];
-	verifierKey = [[masterKey derivedKeyOfLength:keyLength salt:verifySalt iterations:1] retain];
-
-	//update keychain
-	[self setStoresPasswordInKeychain:inKeychain];
-	if (inKeychain)
-		[self setKeychainData:passData];
-	
-	preferencesChanged = YES;
-	
-	if ([delegate respondsToSelector:@selector(databaseEncryptionSettingsChanged)])
-		[delegate databaseEncryptionSettingsChanged];
-}
-
 - (NSData*)WALSessionKey {
+	//the write-ahead log is always stored encrypted; unencrypted databases (now the only kind) use this fixed key,
+	//which keeps journals written by earlier versions recoverable
 	#define CONST_WAL_KEY "This is a 32 byte temporary key"
-	NSData *sessionSalt = [NSData dataWithBytesNoCopy:LOG_SESSION_SALT length:sizeof(LOG_SESSION_SALT) freeWhenDone:NO];
-	
-	if (!doesEncryption)
-		return [NSData dataWithBytesNoCopy:CONST_WAL_KEY length:sizeof(CONST_WAL_KEY) freeWhenDone:NO];
-
-	return [masterKey derivedKeyOfLength:keyLengthInBits/8 salt:sessionSalt iterations:1];
+	return [NSData dataWithBytesNoCopy:CONST_WAL_KEY length:sizeof(CONST_WAL_KEY) freeWhenDone:NO];
 }
 
 - (void)setNotesStorageFormat:(NSInteger)formatID {
@@ -570,26 +343,6 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
     preferencesChanged = YES;
 }
 
-- (void)setDoesEncryption:(BOOL)value {
-	BOOL oldValue = doesEncryption;
-	doesEncryption = value;
-	
-	preferencesChanged = YES;
-
-	if (!doesEncryption) {
-		[self removeKeychainData];
-	
-		//clear out the verifier key and salt?
-		[verifierKey release]; verifierKey = nil;
-		[masterKey release]; masterKey = nil;
-	}
-	
-	if (oldValue != value) {
-		if ([delegate respondsToSelector:@selector(databaseEncryptionSettingsChanged)])
-			[delegate databaseEncryptionSettingsChanged];
-	}
-}
-
 - (void)setSecureTextEntry:(BOOL)value {
 	
 	secureTextEntry = value;
@@ -625,13 +378,6 @@ NSString *NotationPrefsDidChangeNotification = @"NotationPrefsDidChangeNotificat
 	preferencesChanged = YES;
 	
 	return [seenDiskUUIDEntries count] - 1;
-}
-
-- (void)setKeyLengthInBits:(unsigned int)newLength {
-	//can't do this because we don't have password string
-    /*keyLengthInBits = newLength;
-    preferencesChanged = YES;
-    */
 }
 
 + (NSString*)pathExtensionForFormat:(NSInteger)format {

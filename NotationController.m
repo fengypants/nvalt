@@ -267,8 +267,7 @@
 	}
 	//notes were unpacked--now roughly compare notesToVerify with allNotes, plus deletedNotes and notationPrefs
 	if (!notesToVerify || [notesToVerify count] != [allNotes count] || [[frozenNotation deletedNotes] count] != [deletedNotes  count] || 
-		[[frozenNotation notationPrefs] notesStorageFormat] != [notationPrefs notesStorageFormat] ||
-		[[frozenNotation notationPrefs] hashIterationCount] != [notationPrefs hashIterationCount]) {
+		[[frozenNotation notationPrefs] notesStorageFormat] != [notationPrefs notesStorageFormat]) {
 		result = kItemVerifyErr;
 		goto returnResult;
 	}
@@ -606,15 +605,6 @@ bail:
 	
 	exit(1);
     }
-}
-
-//notation prefs delegate method
-- (void)databaseEncryptionSettingsChanged {
-	//we _must_ re-init the journal (if fmt is single-db and jrnl exists) in addition to flushing DB
-	[self flushEverything];
-	
-	//called whenever note-storage format or encryption-activation changes
-	[[ODBEditor sharedODBEditor] initializeDatabase:notationPrefs];
 }
 
 //notation prefs delegate method

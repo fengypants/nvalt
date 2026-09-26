@@ -17,8 +17,6 @@
 
 #import <Cocoa/Cocoa.h>
 
-extern NSString *PasswordWasRetrievedFromKeychainKey;
-extern NSString *RetrievedPasswordKey;
 
 @class NotationController;
 @class NotationPrefs;

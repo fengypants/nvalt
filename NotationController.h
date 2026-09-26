@@ -123,7 +123,6 @@ typedef struct _NoteCatalogEntry {
 - (id)delegate;
 - (void)setDelegate:(id)theDelegate;
 
-- (void)databaseEncryptionSettingsChanged;
 - (void)databaseSettingsChangedFromOldFormat:(NSInteger)oldFormat;
 
 - (NSInteger)currentNoteStorageFormat;

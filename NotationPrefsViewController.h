@@ -19,8 +19,6 @@
 #import <Cocoa/Cocoa.h>
 
 @class NotationPrefs;
-@class PassphrasePicker;
-@class PassphraseChanger;
 
 @interface FileKindListView : NSTableView {
     IBOutlet NSPopUpButton *storageFormatPopupButton;
@@ -34,10 +32,7 @@
 {
     IBOutlet NSTableView *allowedExtensionsTable;
     IBOutlet NSTableView *allowedTypesTable;
-	IBOutlet NSButton *enableEncryptionButton;
-    IBOutlet NSButton *changePasswordButton;
-    IBOutlet NSStepper *keyLengthStepper;
-    IBOutlet NSTextField *keyLengthField, *fileAttributesHelpText;
+    IBOutlet NSTextField *fileAttributesHelpText;
     IBOutlet NSButton *newExtensionButton;
     IBOutlet NSButton *newTypeButton;
 	IBOutlet NSButton *makeDefaultExtensionButton;
@@ -45,9 +40,7 @@
     IBOutlet NSButton *removeTypeButton;
     IBOutlet NSButton *confirmFileDeletionButton;
 	IBOutlet NSButton *secureTextEntryButton;
-	IBOutlet NSButton *removeFromKeychainButton;
     IBOutlet NSPopUpButton *storageFormatPopupButton;
-    IBOutlet NSMatrix *passwordSettingsMatrix;
     IBOutlet NSWindow *webOptionsWindow;
 	
 	//controls of the removed Simplenote "Synchronization" tab; still connected in NotationPrefsView.nib
@@ -56,19 +49,20 @@
 	IBOutlet NSImageView *verifyStatusImageView, *syncEncAlertView;
 	IBOutlet NSTextField *syncEncAlertField;
 	IBOutlet NSPopUpButton *syncingFrequency;
+	
+	//controls of the removed note encryption feature (in the "Security" tab); still connected in NotationPrefsView.nib
+	IBOutlet NSButton *enableEncryptionButton, *changePasswordButton, *removeFromKeychainButton;
+	IBOutlet NSStepper *keyLengthStepper;
+	IBOutlet NSTextField *keyLengthField;
+	IBOutlet NSMatrix *passwordSettingsMatrix;
     
     IBOutlet NSView *view;
 
 	BOOL didAwakeFromNib;
     
-	NSInvocation *postStorageFormatInvocation;
 	NSInteger notesStorageFormatInProgress;
     NotationPrefs *notationPrefs;
-	
-	PassphrasePicker *picker;
-	PassphraseChanger *changer;
 
-	NSString *disableEncryptionString, *enableEncryptionString;
     
 #pragma mark nvALT Finder tagging
     IBOutlet NSButton *useFinderTaggingButton;
@@ -76,34 +70,21 @@
 
 - (NSView*)view;
 - (void)removeSynchronizationTab;
-- (void)setEncryptionControlsState:(BOOL)encryptionState;
+- (void)removeEncryptionControls;
 - (void)setSeparateFileControlsState:(BOOL)separateFileControlsState;
 - (void)initializeControls;
 
 - (IBAction)addedExtension:(id)sender;
 - (IBAction)addedType:(id)sender;
-- (IBAction)changedKeyLength:(id)sender;
-- (IBAction)changedKeychainSettings:(id)sender;
 - (IBAction)changedFileDeletionWarningSettings:(id)sender;
 - (IBAction)changedFileStorageFormat:(id)sender;
-- (IBAction)changePassphrase:(id)sender;
 - (IBAction)changedSecureTextEntry:(id)sender;
-- (IBAction)removeFromKeychain:(id)sender;
-- (void)updateRemoveKeychainItemStatus;
 - (void)notesStorageFormatDidChange;
 - (NSInteger)notesStorageFormatInProgress;
-- (void)runQueuedStorageFormatChangeInvocation;
 - (IBAction)makeDefaultExtension:(id)sender;
 - (IBAction)removedExtension:(id)sender;
 - (IBAction)removedType:(id)sender;
 
-
-- (void)encryptionFormatMismatchSheetDidEnd:(NSWindow *)sheet returnCode:(int)returnCode 
-								contextInfo:(void *)contextInfo;
-- (IBAction)toggledEncryption:(id)sender;
-- (void)enableEncryption;
-- (void)_disableEncryption;
-- (void)disableEncryptionWithWarning:(BOOL)warning;
 
 #pragma mark nvALT Finder tagging
 - (IBAction)switchToFinderTags:(id)sender;
